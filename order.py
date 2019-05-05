@@ -1,51 +1,66 @@
 import requests
-from flask import Flask, jsonify
+from flask import Flask
 
+from block import Block
 from blockchain import Blockchain
 
 app = Flask(__name__)
-anchor_ip = ''
-anchor_port = ''
-
-blockchain = Blockchain()
-# uncomfirmed_transactions = []
-uncomfirmed_transactions = blockchain.uncomfirmed_transactions
+uncomfirmed_transactions = ['Hiếu gửi Hiếu 1 BTC', 'Hiếu bán 1 BTC với giá 8097$',
+                            'Hiếu dùng tiền mua 50 quyển sách và một máy đọc sách']
+anchors = set()
+anchors.add('127.0.0.1:5001')
 
 
-@app.route('/mine')
+@app.route('/mine', methods=['GET', 'POST'])
 def mine():
-    global blockchain, uncomfirmed_transactions
-    number_of_transactions = len(uncomfirmed_transactions)
-    if number_of_transactions == 0:
-        return jsonify({'result': 'None transaction'})
-    elif number_of_transactions < 10:
-        return jsonify({'result': 'Not enough transaction for block. Please wait!'})
+    global last_block, uncomfirmed_transactions
 
-    last_block = blockchain.get_last_block()
+    for anchor in anchors:
+        try:
+            url = 'http://{}/concensus'.format(anchor)
+            http_response = requests.get(url)
+            last_block = http_response.json()['last_block']
+            last_hash = http_response.json()['last_hash']
+        except:
+            print("cannot connect anchor {}". format(anchor))
 
-    new_block = Blockchain.create_new_block(
-        nonce=0,
-        previous_block_hash=last_block.block_header.previous_block_hash,
-        difficult=Blockchain.difficult,
-        index=last_block.index + 1,
-        # size=80,
-        transaction_counter=number_of_transactions,
-        transactions=[],
+    previous_hash = last_hash
+    difficult = last_block['difficult']
+    transaction_counter = len(uncomfirmed_transactions)
+    index = last_block['index'] + 1
+
+    new_block = Block(
+        index, previous_hash, 0, transaction_counter, difficult, uncomfirmed_transactions
     )
 
-    for transaction in uncomfirmed_transactions:
-        new_block.transactions.append(transaction)
-
     uncomfirmed_transactions = []
-    blockchain.uncomfirmed_transactions = []
 
-    blockchain.proof_of_work(new_block)
-    blockchain.add_block(new_block)
+    Blockchain.proof_of_work(new_block)
+
+    for anchor in anchors:
+        try:
+            url = 'http://{}/broadcast_block'.format(anchor)
+            http_response = requests.post(url, json=new_block.__dict__)
+        except:
+            print("cannot connect anchor {}". format(anchor))
+
+    return 'success', 200
 
 
-    try:
-        url = 'http://{}/broadcast_block'.format(anchor_ip + ':' + anchor_port)
-        data = new_block.toDict()
-        requests.post(url, json=data)
-    except:
-        pass    
+@app.route('/order', methods=['GET', 'POST'])
+def line_up():
+    pass
+
+
+if __name__ == '__main__':
+    from argparse import ArgumentParser
+
+    parser = ArgumentParser()
+    parser.add_argument('-p', '--port', default=5002,
+                        type=int, help='port to listen on')
+    args = parser.parse_args()
+    port = args.port
+
+    # print('My ip address : ' + get_ip())
+
+    app.run(port=port, debug=True, threaded=True)

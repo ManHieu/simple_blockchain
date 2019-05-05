@@ -1,28 +1,30 @@
 import hashlib
+import time
 
 
 class Block(object):
-    def __init__(self, block_header, index, transaction_counter, transactions):
-        self.block_header = block_header
+    def __init__(self, index, previous_hash, nonce, transaction_counter, difficult, transactions, timestamp=None):
         self.index = index
+        self.previous_hash = previous_hash
+        self.nonce = nonce
         self.transaction_counter = transaction_counter
+        self.difficult = difficult
         self.transactions = transactions
-        # self.size = size
+        self.timestamp = timestamp or time.time()
 
     def compute_hash(self):
-        # print(self.block_header)
-        block_string = "{}{}{}{}".format(self.block_header, self.index,
-                                           self.transactions, self.transaction_counter)
+        block_string = "{}{}{}{}{}{}{}".format(
+            self.index, self.previous_hash, self.nonce,
+            self.transaction_counter, self.difficult,
+            self.transactions, self.timestamp,
+        )
+
         return hashlib.sha256(block_string.encode()).hexdigest()
 
-    def toDict(self):
-        block = {
-            'block_header': self.block_header.toDict(),
-            'index': self.index,
-            'transaction_counter': self.transaction_counter,
-            # 'size': self.size,
-            'transactions': self.transactions,
-        }
+    @staticmethod
+    def from_dict(data_block):
+        block = Block(data_block['index'], data_block['previous_hash'], data_block['nonce'], 
+                      data_block['transaction_counter'], data_block['difficult'],
+                      data_block['transactions'], data_block['timestamp'],)
+        
         return block
-    
-

@@ -1,99 +1,104 @@
-"""
-anchor peer
-quản lý các general peer trong tổ chức 
-thực hiện các chức năng: 
-- thêm general peer
-- phân quyền các peer (?)
-- nhận block từ order node và broad cast block cho các general peer
-- concensus giữa các general peer
-"""
-
 import requests
 from flask import Flask, jsonify, request
-
-from blockchain import Blockchain
+from block import Block
 
 app = Flask(__name__)
-peer_list = set()
+general_nodes = set()
 
 
-@app.route('/add_node', methods=['GET', 'POST'])
-def validate_conection():
-    # print(request)
+def concensus():
+    longest_data_chain = []
+    longest_lenth = 0
+
+    for peer in general_nodes:
+        try:
+            print("conect to peer {}".format(peer))
+            http_response = requests.get('http://{}/local_chain'.format(peer))
+            response = http_response.json()  # {'chain':chain, 'len': len}
+            data_chain = response['chain']
+            print('local chain of peer {}: {}'.format(peer, response))
+            lenth = response['len']
+
+            if lenth > longest_lenth:
+                longest_data_chain = data_chain
+                longest_lenth = lenth
+
+        except requests.exceptions.ConnectionError:
+            print('Cant connect to node {}. Remove it from peers list'.format(peer))
+            general_nodes.remove(peer)
+
+    return {'chain': longest_data_chain, 'len': longest_lenth}
+
+
+@app.route('/add_node', methods=['POST'])
+def validate_connection():
     data = request.get_json()
-    # print(data)
-
-    if not data:
-        return 'invalid', 400
-
+    print("receive data: {}".format(data))
     request_addr = request.remote_addr
     node = str(request_addr) + ':' + str(data['port'])
+    print(node)
+    general_nodes.add(node)
 
-    peer_list.add(node)
-    print(peer_list)
-    return 'success', 200
+    print("consensusing...")
+    result_chain = concensus()
+    print("result chain: {}".format(result_chain))
 
-# def get_peer_list():
-#     print(peer_list)
+    # general_nodes.add(node)
+    print("current list node {}".format(general_nodes))
 
-
-@app.route('/broadcast_block', methods=['GET', 'POST'])
-def broadcast():
-    data = request.get_json()
-    try:
-        block = Blockchain.create_new_block(
-            data['nonce'], data['previous_block_hash'], data['difficult'], data['index'],
-            data['transaction_counter'], data['transactions']
-        )
-    except:
-        return 'invalid data', 400
-
-    for peer in peer_list:
-        try:
-            url = "http://{}/add_block".format(peer)
-            requests.post(url, json=data)
-
-        except requests.exceptions.ConnectionError:
-            print('Cant connect to node {}. Remove it from peers list'.format(peer))
-            peer_list.remove(peer)
-
-    return "Success", 200
+    return jsonify(result_chain)
 
 
-@app.route('/concensus', methods=['GET'])
+@app.route('/concensus', methods=['GET','POST'])
 def reach_concensus():
-    current_len = 0
-    current_chain = []
-    for peer in peer_list:
-        try:
-            response = requests.get('http://{}/local_chain'.format(peer))
-            lenth = response.get_json()['length']
-            chain_data = response.get_json()['chain']
-            chain = Blockchain.from_list(chain_data)
-            block_chain = Blockchain()
-            block_chain.chain = chain
-            
-            if current_len < lenth and block_chain.is_valid_chain():
-                current_len = lenth
-                current_chain = chain
+    result_chain = concensus()
+    print("send concensus data: {}".format(result_chain))
 
-        except requests.exceptions.ConnectionError:
+    for peer in general_nodes:
+        try:
+            url = 'http://{}/syn_chain'.format(peer)
+            requests.post(url, json=result_chain)
+        except:
             print('Cant connect to node {}. Remove it from peers list'.format(peer))
-            peer_list.remove(peer)
+            general_nodes.remove(peer)
         
-        return jsonify({"length": current_len,
-                       "chain": current_chain})
+    last_block = result_chain['chain'][-1]
+    block = Block.from_dict(last_block)
+    hash = block.compute_hash()
+
+    result_chain['last_block'] = last_block
+    result_chain['last_hash'] = hash
+    
+    return jsonify(result_chain)
+
+
+
+@app.route('/broadcast_block', methods=['GET','POST'])
+def broadcast_block():
+    data = request.get_json()
+    # print("send concensus data: {}".format(result_chain))
+
+    for peer in general_nodes:
+        try:
+            url = 'http://{}/add_block'.format(peer)
+            requests.post(url, json=data)
+        except:
+            print('Cant connect to node {}. Remove it from peers list'.format(peer))
+            general_nodes.remove(peer)
+        
+    return 'success', 200
 
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
 
     parser = ArgumentParser()
-    parser.add_argument('-p', '--port', default=5001,
-                        type=int, help='port to listen on')
+    parser.add_argument('-p', '--port', default=5001, type=int, help='port to listen on')
     args = parser.parse_args()
     port = args.port
 
     # print('My ip address : ' + get_ip())
 
-    app.run(port=port, debug=True, threaded=True)
+    app.run(port=port, debug = True, threaded = True)
+
+
