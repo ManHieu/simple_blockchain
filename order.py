@@ -5,6 +5,7 @@ from block import Block
 from blockchain import Blockchain
 
 app = Flask(__name__)
+# Tạm thời để transaction là string sau này phải định nghĩa lai và có thêm api để thêm transaction
 uncomfirmed_transactions = ['Hiếu gửi Hiếu 1 BTC', 'Hiếu bán 1 BTC với giá 8097$',
                             'Hiếu dùng tiền mua 50 quyển sách và một máy đọc sách']
 anchors = set()
@@ -13,6 +14,10 @@ anchors.add('127.0.0.1:5001')
 
 @app.route('/mine', methods=['GET', 'POST'])
 def mine():
+    """
+    Tạo block mới từ uncomfirmed_transactions
+    
+    """
     global last_block, uncomfirmed_transactions
 
     for anchor in anchors:
@@ -49,6 +54,10 @@ def mine():
 
 @app.route('/order', methods=['GET', 'POST'])
 def line_up():
+    """
+    Nhận yêu cầu thêm transaction từ general node và thêm vào hàng đợi
+    
+    """
     pass
 
 
