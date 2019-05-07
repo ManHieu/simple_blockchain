@@ -1,3 +1,11 @@
+"""
+Chưa làm các service liên quan đến transaction 
+- Định nghĩa tran
+- Validate
+- Xử lý
+- Truy xuất dữ liệu từ block chain 
+- Định nghĩa chain-code (smart contract)
+"""
 import requests
 from flask import Flask, jsonify, request
 
@@ -14,6 +22,9 @@ blockchain = Blockchain()
 
 @app.route('/register')
 def registe():
+    """
+    Đăng ký node mới vs anchor và syn blockchain về
+    """
     global blockchain
     print("last blockchain :{}".format(blockchain.make_json()))
 
@@ -41,15 +52,18 @@ def registe():
 
         except:
             print("cannot connect anchor {}".format(anchor))
-    
+
     print(longest_data_chain)
     blockchain = Blockchain.from_list(longest_data_chain)
     print("current blockchain :{}".format(blockchain.make_json()))
     return "sucess", 200
 
 
-@app.route('/local_chain', methods=['GET','POST'])
+@app.route('/local_chain', methods=['GET', 'POST'])
 def get_local_chain():
+    """
+    Lấy local chain của node
+    """
     chain_data = []
 
     for block in blockchain.chain:
@@ -58,8 +72,11 @@ def get_local_chain():
     return jsonify({"len": len(chain_data), "chain": chain_data})
 
 
-@app.route('/syn_chain', methods=['GET','POST'])
+@app.route('/syn_chain', methods=['GET', 'POST'])
 def syn_chain():
+    """
+    Thực hiện thay local chain bằng chuỗi blockchain nhận đc từ concensus (chạy ở anchor)
+    """
     global blockchain
 
     data = request.get_json()
@@ -72,8 +89,11 @@ def syn_chain():
     return "success", 200
 
 
-@app.route('/add_block', methods=['GET','POST'])
+@app.route('/add_block', methods=['GET', 'POST'])
 def add_block():
+    """
+    Nhận block từ anchor (add_block) và thêm vào chuỗi local chain
+    """
     data = request.get_json()
     new_block = Block.from_dict(data)
 
@@ -82,25 +102,29 @@ def add_block():
     if Blockchain.is_valid_block(new_block, last_block):
         blockchain.add_block(new_block)
         # print('invalid blockchain')
-    
+
     print('new blockchain: {}'.format(blockchain.make_json()))
-    
+
     return 'success', 200
 
 
-@app.route('/deal', methods=['GET','POST'])
+@app.route('/deal', methods=['GET', 'POST'])
 def get_transaction():
+    """
+    validate yêu cầu thêm transaction từ app front-end và yêu cầu order xử lý
+    """
     pass
+
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
 
     parser = ArgumentParser()
-    parser.add_argument('-p', '--port', default=5000, type=int, help='port to listen on')
+    parser.add_argument('-p', '--port', default=5000,
+                        type=int, help='port to listen on')
     args = parser.parse_args()
     port = args.port
 
     # print('My ip address : ' + get_ip())
 
-    app.run(port=port, debug = True, threaded = True)
-
+    app.run(port=port, debug=True, threaded=True)
