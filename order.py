@@ -16,9 +16,9 @@ anchors.add('127.0.0.1:5001')
 def mine():
     """
     Tạo block mới từ uncomfirmed_transactions
-    
+
     """
-    global last_block, uncomfirmed_transactions
+    global uncomfirmed_transactions
 
     for anchor in anchors:
         try:
@@ -26,28 +26,37 @@ def mine():
             http_response = requests.get(url)
             last_block = http_response.json()['last_block']
             last_hash = http_response.json()['last_hash']
-        except:
-            print("cannot connect anchor {}". format(anchor))
-
-    previous_hash = last_hash
-    difficult = last_block['difficult']
-    transaction_counter = len(uncomfirmed_transactions)
-    index = last_block['index'] + 1
-
-    new_block = Block(
-        index, previous_hash, 0, transaction_counter, difficult, uncomfirmed_transactions
-    )
-
-    uncomfirmed_transactions = []
-
-    Blockchain.proof_of_work(new_block)
-
-    for anchor in anchors:
-        try:
+            difficult = last_block['difficult']
+            transaction_counter = len(uncomfirmed_transactions)
+            index = last_block['index'] + 1
+            new_block = Block(
+                index, last_hash, 0, transaction_counter, difficult, uncomfirmed_transactions
+            )
+            Blockchain.proof_of_work(new_block)
             url = 'http://{}/broadcast_block'.format(anchor)
             http_response = requests.post(url, json=new_block.__dict__)
         except:
             print("cannot connect anchor {}". format(anchor))
+
+    # previous_hash = last_hash
+    # difficult = last_block['difficult']
+    # transaction_counter = len(uncomfirmed_transactions)
+    # index = last_block['index'] + 1
+
+    # new_block = Block(
+    #     index, previous_hash, 0, transaction_counter, difficult, uncomfirmed_transactions
+    # )
+
+    uncomfirmed_transactions = []
+
+    # Blockchain.proof_of_work(new_block)
+
+    # for anchor in anchors:
+    #     try:
+    #         url = 'http://{}/broadcast_block'.format(anchor)
+    #         http_response = requests.post(url, json=new_block.__dict__)
+    #     except:
+    #         print("cannot connect anchor {}". format(anchor))
 
     return 'success', 200
 
@@ -56,7 +65,7 @@ def mine():
 def line_up():
     """
     Nhận yêu cầu thêm transaction từ general node và thêm vào hàng đợi
-    
+
     """
     pass
 
